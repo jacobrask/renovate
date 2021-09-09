@@ -65,6 +65,44 @@ describe('workers/repository/updates/branchify', () => {
       const res = await branchifyUpgrades(config, {});
       expect(Object.keys(res.branches)).toHaveLength(1);
     });
+
+    it('deduplicates pin and prioritize upgrade with logJSON', async () => {
+      flattenUpdates.mockResolvedValueOnce([
+        {
+          depName: 'bar',
+          branchName: 'foo-{{version}}',
+          currentValue: '<~ 1.1.0',
+          newValue: '<~ 2.0.0',
+          prTitle: 'some-title',
+          updateType: 'major',
+          packageFile: 'foo/package.json',
+        },
+        {
+          depName: 'foo',
+          branchName: 'foo-{{version}}',
+          currentValue: '<~ 1.1.0',
+          newValue: '1.1.3',
+          prTitle: 'some-title',
+          updateType: 'pin',
+          packageFile: 'foo/package.json',
+          logJSON: { test: 'value' },
+        },
+        {
+          depName: 'foo',
+          branchName: 'foo-{{version}}',
+          currentValue: '<~ 1.1.0',
+          newValue: '<~ 1.2.0',
+          prTitle: 'some-title',
+          updateType: 'minor',
+          packageFile: 'foo/package.json',
+        },
+      ]);
+      config.repoIsOnboarded = true;
+      const res = await branchifyUpgrades(config, {});
+      expect(Object.keys(res.branches)).toHaveLength(1);
+      expect(res.branches['0'].upgrades['0'].logJSON).not.toBeNull();
+    });
+
     it('groups if same compiled branch names', async () => {
       flattenUpdates.mockResolvedValueOnce([
         {

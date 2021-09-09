@@ -45,33 +45,31 @@ export async function branchifyUpgrades(
     addMeta({
       branch: branchName,
     });
-    const seenUpdates = {};
+
     // Filter out duplicates
-    branchUpgrades[branchName] = branchUpgrades[branchName]
-      .reverse()
-      .filter((upgrade) => {
-        const { manager, packageFile, depName, currentValue, newValue } =
-          upgrade;
-        const upgradeKey = `${packageFile}:${depName}:${currentValue}`;
-        const previousNewValue = seenUpdates[upgradeKey];
-        if (previousNewValue && previousNewValue !== newValue) {
-          logger.info(
-            {
-              manager,
-              packageFile,
-              depName,
-              currentValue,
-              previousNewValue,
-              thisNewValue: newValue,
-            },
-            'Ignoring upgrade collision'
-          );
-          return false;
-        }
-        seenUpdates[upgradeKey] = newValue;
-        return true;
-      })
-      .reverse();
+    const deDupMap: Record<string, BranchUpgradeConfig> = {};
+    branchUpgrades[branchName].forEach((upgrade) => {
+      const { manager, packageFile, depName, currentValue, newValue } = upgrade;
+      const upgradeKey = `${packageFile}:${depName}:${currentValue}`;
+      const upgradeValue = deDupMap[upgradeKey];
+
+      if (!upgradeValue?.logJSON) {
+        deDupMap[upgradeKey] = upgrade;
+        return;
+      }
+      logger.info(
+        {
+          manager,
+          packageFile,
+          depName,
+          currentValue,
+          thisNewValue: newValue,
+        },
+        'Ignoring upgrade collision'
+      );
+    });
+    branchUpgrades[branchName] = Object.values(deDupMap);
+
     const branch = generateBranchConfig(branchUpgrades[branchName]);
     branch.branchName = branchName;
     branch.packageFiles = packageFiles;
